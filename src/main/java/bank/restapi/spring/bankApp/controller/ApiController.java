@@ -4,56 +4,71 @@ import bank.restapi.spring.bankApp.model.Account;
 import bank.restapi.spring.bankApp.model.User;
 import bank.restapi.spring.bankApp.service.AccountService;
 import bank.restapi.spring.bankApp.service.AuthService;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@CrossOrigin
+@CrossOrigin(origins = "http://localhost:3000")
 public class ApiController {
 
     private final AuthService authService;
     private final AccountService accountService;
 
+    @Getter
+    @Setter
+    public static class LoginRequest {
+        private String username;
+        private String password;
+
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
         try {
-            User registeredUser = authService.register(user.getUsername(), user.getPassword());
-            return ResponseEntity.ok(registeredUser);
+            User  registered = authService.register(user.getUsername(), user.getPassword());
+
+
+
+            return new ResponseEntity<>(registered, HttpStatus.OK);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("An unexpected error occurred: " + e.getMessage());
         }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User user) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            User loggedInUser = authService.login(user.getUsername(), user.getPassword());
-            return ResponseEntity.ok(loggedInUser);
+            AuthService.LoginResponse response = authService.login(request.getUsername(), request.getPassword());
+            if(response == null) {
+                throw new RuntimeException("Invalid username and password");
+            }
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
         }
     }
 
     @GetMapping("/accounts")
-    public ResponseEntity<List<Account>> getAccounts(@RequestParam String username) {
+    public ResponseEntity<List<Account>> getAccounts(Authentication authentication) {
+        String username = authentication.getName();
         List<Account> accounts = accountService.getAccountsByUsername(username);
         return ResponseEntity.ok(accounts);
     }
 
-
-
     @PostMapping("/accounts")
-    public Account createAccount(@RequestBody Account acc) {
-        return accountService.createAccount(acc);
+    public ResponseEntity<Account> createAccount(@RequestBody Account acc, Authentication authentication) {
+        acc.setUsername(authentication.getName());
+        Account created = accountService.createAccount(acc);
+        return ResponseEntity.ok(created);
     }
 
     @PutMapping("/accounts/deposit")
@@ -66,15 +81,9 @@ public class ApiController {
         return accountService.withdraw(accountNumber, amount);
     }
 
-    // ✅ ADD THIS METHOD FOR DELETION:
     @DeleteMapping("/accounts/{accountNumber}")
     public ResponseEntity<?> deleteAccount(@PathVariable String accountNumber) {
         boolean deleted = accountService.deleteAccount(accountNumber);
-        if (deleted) {
-            return ResponseEntity.ok().build();
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        return deleted ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
     }
-
 }

@@ -7,7 +7,7 @@ import java.util.List;
 import bank.restapi.spring.bankApp.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.util.List;
+
 
 @Service
 @RequiredArgsConstructor
